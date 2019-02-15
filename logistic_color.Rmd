@@ -1,0 +1,161 @@
+---
+title: "part2"
+author: "Vivek Sahukar"
+date: "11/25/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(tidytext)
+library(arm)
+library(pROC)
+library(nnet)
+library(GGally)
+library(ROCR)
+library(AER)
+set.seed(123)
+```
+
+```{r}
+# Read in data
+red <- read.csv('winequality-red.csv', sep = ';')
+white <- read.csv('winequality-white.csv', sep = ';')
+
+# Combine two red and white datasets while creating new variable: color: '1' for white and '0' for red
+red$color <- 0
+white$color <- 1
+wr <- rbind(red, white)
+
+# dividing quality into 3 categories: 1 (< 6), 2 (= 6), 3 (> 6)
+wr$quality[wr$quality < 6] <- 1
+wr$quality[wr$quality == 6] <- 2
+wr$quality[wr$quality > 6] <- 3
+
+```
+
+
+```{r}
+# Summary of the dataset
+glimpse(wr)
+summary(wr)
+cor(wr)
+# ggpairs(wr)
+```
+
+```{r}
+# Exploratory Data Analysis
+
+# EDA for continuous predictor variables:  
+
+# Do boxplots
+par(mfcol = c(2, 3))
+boxplot(fixed.acidity ~ color, data = wr, ylab = 'fixed.acidity', xlab = 'color')
+boxplot(volatile.acidity ~ color, data = wr, ylab = 'volatile.acidity', xlab = 'color')
+boxplot(citric.acid ~ color, data = wr, ylab = 'citric.acid', xlab = 'color')
+boxplot(residual.sugar ~ color, data = wr, ylab = 'residual.sugar', xlab = 'color')
+boxplot(chlorides ~ color, data = wr, ylab = 'chlorides', xlab = 'color')
+boxplot(free.sulfur.dioxide ~ color, data = wr, ylab = 'free.sulfur.dioxide', xlab = 'color')
+boxplot(total.sulfur.dioxide ~ color, data = wr, ylab = 'total.sulfur.dioxide', xlab = 'color')
+boxplot(density ~ color, data = wr, ylab = 'density', xlab = 'color')
+boxplot(pH ~ color, data = wr, ylab = 'pH', xlab = 'color')
+boxplot(sulphates ~ color, data = wr, ylab = 'sulphates', xlab = 'color')
+boxplot(alcohol ~ color, data = wr, ylab = 'alcohol', xlab = 'color')
+
+
+# Make binned plots
+par(mfcol = c(2, 3))
+binnedplot(x = wr$fixed.acidity, y = wr$color, xlab = 'fixed.acidity', ylab = 'color', main = 'Binned fixed.acidity and color')
+binnedplot(x = wr$volatile.acidity, y = wr$color, xlab = 'volatile.acidity', ylab = 'color', main = 'Binned volatile acidity and color')
+binnedplot(x = wr$citric.acid, y = wr$color, xlab = 'citric.acid', ylab = 'color', main = 'Binned citric acid and color')
+binnedplot(x = wr$residual.sugar, y = wr$color, xlab = 'residual.sugar', ylab = 'color', main = 'Binned residual sugar and color')
+binnedplot(x = wr$chlorides, y = wr$color, xlab = 'chlorides', ylab = 'color', main = 'Binned chlorides and color')
+binnedplot(x = wr$free.sulfur.dioxide, y = wr$color, xlab = 'free.sulfur.dioxide', ylab = 'color', main = 'Binned free sulfur dioxide and color')
+binnedplot(x = wr$total.sulfur.dioxide, y = wr$color, xlab = 'total.sulfur.dioxide', ylab = 'color', main = 'Binned total sulfur dioxide and color')
+binnedplot(x = wr$density, y = wr$color, xlab = 'density', ylab = 'color', main = 'Binned density and color')
+binnedplot(x = wr$pH, y = wr$color, xlab = 'pH', ylab = 'color', main = 'Binned pH and color')
+binnedplot(x = wr$sulphates, y = wr$color, xlab = 'sulphates', ylab = 'color', main = 'Binned sulphates and color')
+binnedplot(x = wr$alcohol, y = wr$color, xlab = 'alcohol', ylab = 'color', main = 'Binned alcohol and color')
+
+# EDA for 1 factor variable (quality)
+tapply(wr$color, wr$quality, mean)
+table(wr$quality)
+table(wr$color)
+table(wr$color, wr$quality)
+```
+
+```{r}
+# Mean centering the continuous predictor variables except quality 
+# wr.m has all the mean centred predictor variables
+
+wr.m <- wr
+
+wr.m$fixed.acidity <- wr.m$fixed.acidity - mean(wr.m$fixed.acidity)
+wr.m$volatile.acidity <- wr.m$volatile.acidity - mean(wr.m$volatile.acidity)
+wr.m$citric.acid <- wr.m$citric.acid - mean(wr.m$citric.acid)
+wr.m$residual.sugar <- wr.m$residual.sugar - mean(wr.m$residual.sugar)
+wr.m$chlorides <- wr.m$chlorides - mean(wr.m$chlorides)
+wr.m$free.sulfur.dioxide <- wr.m$free.sulfur.dioxide - mean(wr.m$free.sulfur.dioxide)
+wr.m$total.sulfur.dioxide <- wr.m$total.sulfur.dioxide - mean(wr.m$total.sulfur.dioxide)
+wr.m$density <- wr.m$density - mean(wr.m$density)
+wr.m$pH <- wr.m$pH - mean(wr.m$pH)
+wr.m$sulphates <- wr.m$sulphates - mean(wr.m$sulphates)
+wr.m$alcohol <- wr.m$alcohol - mean(wr.m$alcohol)
+```
+
+
+```{r}
+# Simple logistic regression - without any transformations or interactions
+
+color_logit = glm(color ~ . - quality + as.factor(quality), data = wr.m, family = binomial)
+summary(color_logit)
+confint.default(color_logit)
+predprobs = predict(color_logit, type = "response")
+```
+
+```{r}
+# Logistic regression model 1 diagnostics
+
+# one stop plot for initial check
+rawresids = wr.m$color - predprobs
+binnedplot(x = predprobs, y = rawresids, xlab = "Predicted Probabilities")
+
+# Binned plots
+rawresid1 <- wr.m$color - fitted(color_logit)
+
+par(mfcol=c(2, 3))
+binnedplot(x = wr.m$fixed.acidity, y = rawresid1, xlab = 'fixed.acidity', ylab = 'Residuals')
+binnedplot(x = wr.m$volatile.acidity, y = rawresid1, xlab = 'volatile.acidity', ylab = 'Residuals')
+binnedplot(x = wr.m$citric.acid, y = rawresid1, xlab = 'citric.acid', ylab = 'Residuals')
+binnedplot(x = wr.m$residual.sugar, y = rawresid1, xlab = 'residual.sugar', ylab = 'Residuals')
+binnedplot(x = wr.m$chlorides, y = rawresid1, xlab = 'chlorides', ylab = 'Residuals')
+binnedplot(x = wr.m$free.sulfur.dioxide, y = rawresid1, xlab = 'free.sulfur.dioxide', ylab = 'Residuals')
+binnedplot(x = wr.m$total.sulfur.dioxide, y = rawresid1, xlab = 'total.sulfur.dioxide', ylab = 'Residuals')
+binnedplot(x = wr.m$density, y = rawresid1, xlab = 'density', ylab = 'Residuals')
+binnedplot(x = wr.m$pH, y = rawresid1, xlab = 'pH', ylab = 'Residuals')
+binnedplot(x = wr.m$sulphates, y = rawresid1, xlab = 'sulphates', ylab = 'Residuals')
+binnedplot(x = wr.m$alcohol, y = rawresid1, xlab = 'alcohol', ylab = 'Residuals')
+
+# Average residuals by quality
+tapply(rawresid1, wr.m$quality, mean)
+```
+
+```{r}
+# Confusion matrix & ROC curves
+threshold = 0.536
+CM <- table(wr.m$color, color_logit$fitted > threshold)
+CM
+accuracy = (sum(diag(CM)))/sum(CM)
+accuracy
+
+roc(wr.m$color, fitted(color_logit), plot=T, legacy.axes=T, print.thres = 'best')
+library(caret)
+
+```
+
+

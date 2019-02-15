@@ -1,0 +1,276 @@
+---
+title: "multinom_plain_red"
+author: "Vivek Sahukar"
+date: "12/4/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(tidytext)
+library(arm)
+library(pROC)
+library(nnet)
+library(AER)
+```
+
+```{r}
+# Read in data
+red <- read.csv('winequality-red.csv', sep = ';', stringsAsFactors = F)
+
+# dividing quality into 3 categories: 1 (< 6), 2 (= 6), 3 (> 6)
+red$quality[red$quality < 6] <- 1
+red$quality[red$quality == 6] <- 2
+red$quality[red$quality > 6] <- 3
+
+# Make another copy of the red wine dataset with mean centered predictors.
+red.m <- red
+
+# Mean centering all the predictors
+red.m$fixed.acidity <- red.m$fixed.acidity - mean(red.m$fixed.acidity)
+red.m$volatile.acidity <- red.m$volatile.acidity - mean(red.m$volatile.acidity)
+red.m$citric.acid <- red.m$citric.acid - mean(red.m$citric.acid)
+red.m$residual.sugar <- red.m$residual.sugar - mean(red.m$residual.sugar)
+red.m$chlorides <- red.m$chlorides - mean(red.m$chlorides)
+red.m$free.sulfur.dioxide <- red.m$free.sulfur.dioxide - mean(red.m$free.sulfur.dioxide)
+red.m$total.sulfur.dioxide <- red.m$total.sulfur.dioxide - mean(red.m$total.sulfur.dioxide)
+red.m$density <- red.m$density - mean(red.m$density)
+red.m$pH <- red.m$pH - mean(red.m$pH)
+red.m$sulphates <- red.m$sulphates - mean(red.m$sulphates)
+red.m$alcohol <- red.m$alcohol - mean(red.m$alcohol)
+
+```
+
+```{r}
+# Red wine dataset summary
+r <- summary(red)
+glimpse(red)
+str(red)
+r
+```
+
+```{r}
+# Check how many cases in different levels of outcome variable (quality)
+table(red$quality)
+pairs(red)
+red_cor <- cor(red)
+
+```
+
+```{r}
+# Inspect box plots for exploratory data analysis
+par(mfcol=c(2, 3))
+boxplot(fixed.acidity ~ quality, data = red, ylab = 'fixed.acidity', xlab = 'quality (red)')
+boxplot(volatile.acidity ~ quality, data = red, ylab = 'volatile.acidity', xlab = 'quality (red)')
+boxplot(citric.acid ~ quality, data = red, ylab = 'citric.acid', xlab = 'quality (red)')
+boxplot(residual.sugar ~ quality, data = red, ylab = 'residual.sugar', xlab = 'quality (red)')
+boxplot(chlorides ~ quality, data = red, ylab = 'chlorides', xlab = 'quality (red)')
+boxplot(free.sulfur.dioxide ~ quality, data = red, ylab = 'free.sulfur.dioxide', xlab = 'quality (red)')
+boxplot(total.sulfur.dioxide ~ quality, data = red, ylab = 'total.sulfur.dioxide', xlab = 'quality (red)')
+boxplot(density ~ quality, data = red, ylab = 'density', xlab = 'quality (red)')
+boxplot(pH ~ quality, data = red, ylab = 'pH', xlab = 'quality (red)')
+boxplot(sulphates ~ quality, data = red, ylab = 'sulphates', xlab = 'quality (red)')
+boxplot(alcohol ~ quality, data = red, ylab = 'alcohol', xlab = 'quality (red)')
+```
+
+```{r}
+# Binned plots for exploratory data analysis
+par(mfcol=c(2, 3))
+binnedplot(x = red$fixed.acidity, y =  red$quality, xlab = 'fixed.acidity', ylab = 'quality (red)', main = 'Binned Fixed Acidity & Quality')
+binnedplot(x = red$volatile.acidity, y =  red$quality, xlab = 'volatile.acidity', ylab = 'quality (red)', main = 'Binned Volatile Acidity & Quality')
+binnedplot(x = red$citric.acid, y =  red$quality, xlab = 'citric.acid', ylab = 'quality (red)', main = 'Binned Citric Acid & Quality')
+binnedplot(x = red$residual.sugar, y =  red$quality, xlab = 'residual.sugar', ylab = 'quality (red)', main = 'Binned Residual sugar & Quality')
+binnedplot(x = red$chlorides, y =  red$quality, data = red, xlab = 'chlorides', ylab = 'quality (red)', main = 'Binned Chlorides & Quality')
+binnedplot(x = red$free.sulfur.dioxide, y =  red$quality, xlab = 'free.sulfur.dioxide', ylab = 'quality (red)', main = 'Binned Free sulfur dioxide & Quality')
+binnedplot(x = red$total.sulfur.dioxide, y =  red$quality, xlab = 'total.sulfur.dioxide', ylab = 'quality (red)', main = 'Binned Total sulfur dioxide & Quality')
+binnedplot(x = red$density, y =  red$quality, xlab = 'density', ylab = 'quality (red)', main = 'Binned Density & Quality')
+binnedplot(x = red$pH, y =  red$quality, xlab = 'pH', ylab = 'quality (red)', main = 'Binned pH & Quality')
+binnedplot(x = red$sulphates, y =  red$quality, xlab = 'sulphates', ylab = 'quality (red)', main = 'Binned Sulphates & Quality')
+binnedplot(x = red$alcohol, y =  red$quality, xlab = 'alcohol', ylab = 'quality (red)', main = 'Binned Alcohol & Quality')
+```
+
+
+```{r}
+# Fit mulitinomial regression model, by keeping all variables without any transformations or interactions
+
+red_multinom <- multinom(quality ~ ., data = red.m)
+red_multinom_summary <- summary(red_multinom)
+red_multinom_summary
+
+# Get interpretations in terms of multiplicative factors for odds
+exp_coef_red_multinom <- exp(coef(red_multinom))
+write.table(exp_coef_red_multinom, 'exp_coef_red_multinom.txt', sep="\t")
+
+# Get confidence intervals
+
+confint_red_multinom <- confint(red_multinom)
+write.table(confint_red_multinom, 'confint_red_multinom.txt', sep="\t")
+
+exp_confint_red_multinom <- exp(confint(red_multinom))
+write.table(exp_confint_red_multinom, 'exp_confint_red_multinom.txt', sep="\t")
+
+# Get p-values 
+p_value_red_multinom <- coeftest(red_multinom)
+write.table(p_value_red_multinom, 'p_value_red_multinom.txt', sep="\t")
+```
+
+```{r}
+# prediction of probabilities
+predprobs <- fitted(red_multinom)
+
+# plot of predicted values
+par(mfcol = c(1, 3))
+plot(y = predprobs[, 1], x = red$quality, xlab = 'Quality (red)', ylab = 'Predicted Probability of Quality Category 1')
+plot(y = predprobs[, 2], x = red$quality, xlab = 'Quality (red)', ylab = 'Predicted Probability of Quality Category 2')
+plot(y = predprobs[, 3], x = red$quality, xlab = 'Quality (red)', ylab = 'Predicted Probability of Quality Category 3')
+
+```
+
+
+
+```{r}
+# diagnostics
+rawresid1 = (red$quality == 1) - predprobs[, 1]
+rawresid2 = (red$quality == 2) - predprobs[, 2]
+rawresid3 = (red$quality == 3) - predprobs[, 3]
+
+par(mfcol = c(3,3))
+
+binnedplot(red$fixed.acidity, rawresid1, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$fixed.acidity, rawresid2, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$fixed.acidity, rawresid3, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$volatile.acidity, rawresid1, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$volatile.acidity, rawresid2, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$volatile.acidity, rawresid3, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$citric.acid, rawresid1, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$citric.acid, rawresid2, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$citric.acid, rawresid3, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$residual.sugar, rawresid1, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$residual.sugar, rawresid2, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$residual.sugar, rawresid3, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$chlorides, rawresid1, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$chlorides, rawresid2, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$chlorides, rawresid3, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$free.sulfur.dioxide, rawresid1, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$free.sulfur.dioxide, rawresid2, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$free.sulfur.dioxide, rawresid3, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$total.sulfur.dioxide, rawresid1, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$total.sulfur.dioxide, rawresid2, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$total.sulfur.dioxide, rawresid3, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$density, rawresid1, xlab = "density", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$density, rawresid2, xlab = "density", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$density, rawresid3, xlab = "density", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$pH, rawresid1, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$pH, rawresid2, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$pH, rawresid3, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$sulphates, rawresid1, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$sulphates, rawresid2, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$sulphates, rawresid3, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$alcohol, rawresid1, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$alcohol, rawresid2, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$alcohol, rawresid3, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+```
+
+```{r}
+# Confusion matrix
+
+# Get predicted category based on highest probability
+pred_cat <-  predict(red_multinom)
+CM <- table(pred_cat, red.m$quality)
+accuracy = (sum(diag(CM)))/sum(CM)
+CM
+accuracy
+
+# Get predicted probability for each category of wine
+pred_prob <- predict(red_multinom, type = 'probs')
+```
+
+```{r}
+# Additional explorations
+
+# Check whether variables which are not significant (having p value > 0.05) are useful predictors or not.
+# fixed acidity, citric acid,  residual sugar, pH
+
+redreg1 <- multinom(quality ~ . - pH, data = red.m)
+anova(red_multinom, redreg1)
+
+summary(redreg1)
+coeftest(redreg1)
+
+predprobs1 <-  predict(redreg1)
+CM <- table(predprobs1, red.m$quality)
+accuracy = (sum(diag(CM)))/sum(CM)
+CM
+accuracy
+# All except pH are relevant, however prediction accuracy decreased from 63.91% to 63.79%. Also binned plots grew worse for alcohol and free sulfur dioxide.
+# Therefore all the predictors are kept in the model for better explanatory power of the model. 
+
+# diagnostics
+rawresid1 = (red$quality == 1) - predprobs[, 1]
+rawresid2 = (red$quality == 2) - predprobs[, 2]
+rawresid3 = (red$quality == 3) - predprobs[, 3]
+
+par(mfcol = c(3,3))
+
+binnedplot(red$fixed.acidity, rawresid1, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$fixed.acidity, rawresid2, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$fixed.acidity, rawresid3, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$volatile.acidity, rawresid1, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$volatile.acidity, rawresid2, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$volatile.acidity, rawresid3, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$citric.acid, rawresid1, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$citric.acid, rawresid2, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$citric.acid, rawresid3, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$residual.sugar, rawresid1, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$residual.sugar, rawresid2, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$residual.sugar, rawresid3, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$chlorides, rawresid1, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$chlorides, rawresid2, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$chlorides, rawresid3, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$free.sulfur.dioxide, rawresid1, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$free.sulfur.dioxide, rawresid2, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$free.sulfur.dioxide, rawresid3, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$total.sulfur.dioxide, rawresid1, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$total.sulfur.dioxide, rawresid2, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$total.sulfur.dioxide, rawresid3, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$density, rawresid1, xlab = "density", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$density, rawresid2, xlab = "density", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$density, rawresid3, xlab = "density", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$pH, rawresid1, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$pH, rawresid2, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$pH, rawresid3, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$sulphates, rawresid1, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$sulphates, rawresid2, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$sulphates, rawresid3, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+binnedplot(red$alcohol, rawresid1, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: quality (red) = 1")
+binnedplot(red$alcohol, rawresid2, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: quality (red) = 2")
+binnedplot(red$alcohol, rawresid3, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: quality (red) = 3")
+
+
+```
+

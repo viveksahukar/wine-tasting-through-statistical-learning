@@ -1,0 +1,93 @@
+---
+title: "ml_models_red"
+author: "Vivek Sahukar"
+date: "11/29/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(tidytext)
+library(arm)
+library(pROC)
+library(nnet)
+library(randomForest)
+library(caret)
+library(rpart)
+set.seed(123)
+```
+
+```{r}
+# Read in data
+red <- read.csv('winequality-red.csv', sep = ';', stringsAsFactors = F)
+
+
+# dividing quality into 3 categories: 1 (< 6), 2 (= 6), 3 (> 6)
+red$quality[red$quality < 6] <- 1
+red$quality[red$quality == 6] <- 2
+red$quality[red$quality > 6] <- 3
+
+red$quality <- as.factor(red$quality)
+
+glimpse(red)
+sum(is.na(red))
+```
+
+```{r}
+# Split 'red' data into training & testing data
+ind <- sample(2, nrow(red), replace=TRUE, prob=c(0.7,0.3))
+trainData <-  red[ind==1,]
+testData <- red[ind==2,]
+```
+
+```{r}
+# Generate random forest model
+red_rf = randomForest(quality~., data=trainData, ntree=100, proximity=T)
+table(predict(red_rf), trainData$quality)
+
+red_rf
+```
+
+```{r}
+plot(red_rf)
+```
+
+```{r}
+importance(red_rf)
+```
+
+```{r}
+redPred = predict(red_rf, newdata = testData)
+table(redPred, testData$quality)
+```
+
+```{r}
+plot(margin(red_rf, testData$quality))
+CM = table(redPred, testData$quality)
+CM
+accuracy = (sum(diag(CM)))/sum(CM)
+accuracy
+confusionMatrix(redPred, testData$quality)
+
+```
+
+```{r}
+# Generate svm model
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+svm_Linear <- train(quality ~., data = trainData, method = "svmLinear",
+                 trControl=trctrl,
+                 preProcess = c("center", "scale"),
+                 tuneLength = 10)
+svm_Linear
+```
+
+```{r}
+# Predict using svm model
+svm_test_predict <- predict(svm_Linear, newdata = testData)
+confusionMatrix(svm_test_predict, testData$quality)
+```

@@ -1,0 +1,241 @@
+---
+title: "Part1"
+author: "Vivek Sahukar"
+date: "11/25/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(tidytext)
+library(arm)
+library(pROC)
+library(nnet)
+library(AER)
+```
+
+```{r}
+# Read in data
+white <- read.csv('winequality-white.csv', sep = ';', stringsAsFactors = F)
+
+# Make original copy of the white wine dataset: white.o , so that it can be used later on.
+white.o <- white
+
+# Taking log transformations of all the predictors
+white$log.fixed.acidity <- log(white$fixed.acidity + 0.00001)
+white$log.volatile.acidity <- log(white$volatile.acidity + 0.00001)
+white$log.citric.acid <- log(white$citric.acid + 0.00001)
+white$log.residual.sugar <- log(white$residual.sugar + 0.00001)
+white$log.chlorides <- log(white$chlorides + 0.00001)
+white$log.free.sulfur.dioxide <- log(white$free.sulfur.dioxide + 0.00001)
+white$log.total.sulfur.dioxide <- log(white$total.sulfur.dioxide + 0.00001)
+white$log.density <- log(white$density + 0.00001)
+white$log.pH <- log(white$pH + 0.00001)
+white$log.sulphates <- log(white$sulphates + 0.00001)
+white$log.alcohol <- log(white$alcohol + 0.00001)
+
+# Mean centering all the predictors
+white$m.fixed.acidity <- white$fixed.acidity - mean(white$fixed.acidity)
+white$m.volatile.acidity <- white$volatile.acidity - mean(white$volatile.acidity)
+white$m.citric.acid <- white$citric.acid - mean(white$citric.acid)
+white$m.residual.sugar <- white$residual.sugar - mean(white$residual.sugar)
+white$m.chlorides <- white$chlorides - mean(white$chlorides)
+white$m.free.sulfur.dioxide <- white$free.sulfur.dioxide - mean(white$free.sulfur.dioxide)
+white$m.total.sulfur.dioxide <- white$total.sulfur.dioxide - mean(white$total.sulfur.dioxide)
+white$m.density <- white$density - mean(white$density)
+white$m.pH <- white$pH - mean(white$pH)
+white$m.sulphates <- white$sulphates - mean(white$sulphates)
+white$m.alcohol <- white$alcohol - mean(white$alcohol)
+
+# Mean centering the log transformed predictors
+white$log.m.fixed.acidity <- white$log.fixed.acidity - mean(white$log.fixed.acidity)
+white$log.m.volatile.acidity <- white$log.volatile.acidity - mean(white$log.volatile.acidity)
+white$log.m.citric.acid <- white$log.citric.acid - mean(white$log.citric.acid)
+white$log.m.residual.sugar <- white$log.residual.sugar - mean(white$log.residual.sugar)
+white$log.m.chlorides <- white$log.chlorides - mean(white$log.chlorides)
+white$log.m.free.sulfur.dioxide <- white$log.free.sulfur.dioxide - mean(white$log.free.sulfur.dioxide)
+white$log.m.total.sulfur.dioxide <- white$log.total.sulfur.dioxide - mean(white$log.total.sulfur.dioxide)
+white$log.m.density <- white$log.density - mean(white$log.density)
+white$log.m.pH <- white$log.pH - mean(white$log.pH)
+white$log.m.sulphates <- white$log.sulphates - mean(white$log.sulphates)
+white$log.m.alcohol <- white$log.alcohol - mean(white$log.alcohol)
+
+# Squaring the predictors
+white$sq.m.fixed.acidity <- white$m.fixed.acidity ^ 2
+white$sq.m.volatile.acidity <- white$m.volatile.acidity ^ 2
+white$sq.m.citric.acid <- white$m.citric.acid ^ 2
+white$sq.m.residual.sugar <- white$m.residual.sugar ^ 2
+white$sq.m.chlorides <- white$m.chlorides ^ 2
+white$sq.m.free.sulfur.dioxide <- white$m.free.sulfur.dioxide ^ 2
+white$sq.m.total.sulfur.dioxide <- white$m.total.sulfur.dioxide ^ 2
+white$sq.m.density <- white$m.density ^ 2
+white$sq.m.pH <- white$m.pH ^ 2
+white$sq.m..sulphates <- white$m.sulphates ^ 2
+white$sq.m.alcohol <- white$m.alcohol ^ 2
+
+# dividing quality into 3 categories: 1 (< 6), 2 (= 6), 3 (> 6)
+white$quality[white$quality < 6] <- 1
+white$quality[white$quality == 6] <- 2
+white$quality[white$quality > 6] <- 3
+```
+
+
+```{r}
+# Check how many cases in different levels of outcome variable (quality)
+table(white$quality)
+pairs(white.o)
+cor(white.o)
+```
+
+```{r}
+
+# Inspect box plots for exploratory data analysis
+par(mfcol = c(2, 3))
+boxplot(fixed.acidity ~ quality, data = white, ylab = 'fixed.acidity', xlab = 'white - quality')
+boxplot(volatile.acidity ~ quality, data = white, ylab = 'volatile.acidity', xlab = 'white - quality')
+boxplot(citric.acid ~ quality, data = white, ylab = 'citric.acid', xlab = 'white - quality')
+boxplot(residual.sugar ~ quality, data = white, ylab = 'residual.sugar', xlab = 'white - quality')
+boxplot(chlorides ~ quality, data = white, ylab = 'chlorides', xlab = 'white - quality')
+boxplot(free.sulfur.dioxide ~ quality, data = white, xlab = 'free.sulfur.dioxide', ylab = 'white - quality')
+boxplot(total.sulfur.dioxide ~ quality, data = white, xlab = 'total.sulfur.dioxide', ylab = 'white - quality')
+boxplot(density ~ quality, data = white, ylab = 'density', xlab = 'white - quality')
+boxplot(pH ~ quality, data = white, ylab = 'pH', xlab = 'white - quality')
+boxplot(sulphates ~ quality, data = white, ylab = 'sulphates', xlab = 'white - quality')
+boxplot(alcohol ~ quality, data = white, ylab = 'alcohol', xlab = 'white - quality')
+```
+
+```{r}
+# Inspect binned plots for EDA
+par(mfcol=c(3, 2))
+binnedplot(x = white$fixed.acidity, y =  white$quality, xlab = 'fixed.acidity', ylab = 'Quality', main = 'Binned Fixed Acidity & White Quality')
+binnedplot(x = white$volatile.acidity, y =  white$quality, xlab = 'volatile.acidity', ylab = 'Quality', main = 'Binned Volatile Acidity & White Quality')
+binnedplot(x = white$citric.acid, y =  white$quality, xlab = 'citric.acid', ylab = 'Quality', main = 'Binned Citric Acid & White Quality')
+binnedplot(x = white$residual.sugar, y =  white$quality, xlab = 'residual.sugar', ylab = 'Quality', main = 'Binned Residual sugar & White Quality')
+binnedplot(x = white$chlorides, y =  white$quality, data = white, xlab = 'chlorides', ylab = 'Quality', main = 'Binned Chlorides & White Quality')
+binnedplot(x = white$free.sulfur.dioxide, y =  white$quality, xlab = 'free.sulfur.dioxide', ylab = 'Quality', main = 'Binned Free sulfur dioxide & White Quality')
+binnedplot(x = white$total.sulfur.dioxide, y =  white$quality, xlab = 'total.sulfur.dioxide', ylab = 'Quality', main = 'Binned Total sulfur dioxide & White Quality')
+binnedplot(x = white$density, y =  white$quality, xlab = 'density', ylab = 'Quality', main = 'Binned Density & White Quality')
+binnedplot(x = white$pH, y =  white$quality, xlab = 'pH', ylab = 'Quality', main = 'Binned pH & White Quality')
+binnedplot(x = white$sulphates, y =  white$quality, xlab = 'sulphates', ylab = 'Quality', main = 'Binned Sulphates & White Quality')
+binnedplot(x = white$alcohol, y =  white$quality, xlab = 'alcohol', ylab = 'Quality', main = 'Binned Alcohol & White Quality')
+```
+
+
+```{r}
+# Fit mulitinomial regression model, first by keeping all variables without any transformations or interactions
+# Do you need to convert quality to factor variable using as.factor
+white.reg1 <- multinom(quality ~ m.fixed.acidity +
+                                          m.volatile.acidity +
+                                          m.citric.acid +
+                                          m.residual.sugar +
+                                          m.chlorides +
+                                          m.free.sulfur.dioxide +
+                                          m.total.sulfur.dioxide +
+                                          m.density +
+                                          m.pH +
+                                          m.sulphates
+                                          , data = white) 
+summary(white.reg1)
+exp(coef(white.reg1))
+confint(white.reg1)
+exp(confint(white.reg1))
+
+"
+white.reg1.no.fixed.acidity <- multinom(quality ~ . - fixed.acidity, data = white.m)
+anova(white.reg1, white.reg1.no.fixed.acidity, test = 'Chisq')
+"
+
+pwhiteprobs <- fitted(white.reg1)
+
+"
+z <- summary(white.reg1)$coefficients/summary(white.reg1)$standard.errors
+# 2-tailed Wald z tests to test significance of coefficients
+p <- (1 - pnorm(abs(z), 0, 1)) * 2
+p
+"
+coeftest(white.reg1)
+
+```
+
+```{r}
+# prediction of data 
+
+# Confusion matrix
+pred.white1 <-  predict(white.reg1)
+CM <- table(pred.white1, white$quality)
+CM
+accuracy = (sum(diag(CM)))/sum(CM)
+accuracy
+# confusionMatrix(pwhites1, white.o$quality)
+```
+
+```{r}
+# prediction of data 
+
+# plot of predicted values
+plot(y = predprobs[, 1], x = white.m$quality, xlab = 'Quality', ylab = 'Predicted Probability of Quality Category = 1')
+plot(y = predprobs[, 2], x = white.m$quality, xlab = 'Quality', ylab = 'Predicted Probability of Quality Category = 2')
+plot(y = predprobs[, 3], x = white.m$quality, xlab = 'Quality', ylab = 'Predicted Probability of Quality Category = 3')
+```
+
+
+```{r}
+# diagnostics
+rawresid1 = (white$quality == 1) - pwhiteprobs[, 1]
+rawresid2 = (white$quality == 2) - pwhiteprobs[, 2]
+rawresid3 = (white$quality == 3) - pwhiteprobs[, 3]
+
+par(mfcol = c(3,3))
+
+binnedplot(white$fixed.acidity, rawresid1, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$fixed.acidity, rawresid2, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$fixed.acidity, rawresid3, xlab = "fixed.acidity", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$volatile.acidity, rawresid1, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$volatile.acidity, rawresid2, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$volatile.acidity, rawresid3, xlab = "volatile.acidity", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$citric.acid, rawresid1, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$citric.acid, rawresid2, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$citric.acid, rawresid3, xlab = "citric.acid", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$residual.sugar, rawresid1, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$residual.sugar, rawresid2, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$residual.sugar, rawresid3, xlab = "residual.sugar", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$chlorides, rawresid1, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$chlorides, rawresid2, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$chlorides, rawresid3, xlab = "chlorides", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$free.sulfur.dioxide, rawresid1, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$free.sulfur.dioxide, rawresid2, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$free.sulfur.dioxide, rawresid3, xlab = "free.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$total.sulfur.dioxide, rawresid1, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$total.sulfur.dioxide, rawresid2, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$total.sulfur.dioxide, rawresid3, xlab = "total.sulfur.dioxide", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$density, rawresid1, xlab = "density", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$density, rawresid2, xlab = "density", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$density, rawresid3, xlab = "density", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$pH, rawresid1, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$pH, rawresid2, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$pH, rawresid3, xlab = "pH", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$sulphates, rawresid1, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$sulphates, rawresid2, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$sulphates, rawresid3, xlab = "sulphates", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+
+binnedplot(white$alcohol, rawresid1, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: white quality = 1")
+binnedplot(white$alcohol, rawresid2, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: white quality = 2")
+binnedplot(white$alcohol, rawresid3, xlab = "alcohol", ylab = "Raw residuals", main = "Binned plot: white quality = 3")
+```
+
