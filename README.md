@@ -7,3 +7,5 @@ The legend describing the files containing the R code has been included as a tex
 
 The powerpoint presentation detailing the methodology and results has been provided as a pdf file.
 
+This analysis was submitted as a poster for final project in course "Modeling & Representation of Data" in December 2018, as part of Masters degree in Interdisciplinary Data Science at Duke University. 
+
